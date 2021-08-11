@@ -27,6 +27,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+DICE_TABLE = {}
+for simple, squared in zip(range(65, 65 + 26), range(127280, 127280 + 26)):
+    DICE_TABLE[chr(simple)] = chr(squared)
+DICE_TABLE["CH"] = "Ch"
+
+
+DICE_DISTRIBUTION = [
+    ("A", 5)
+    # FIXME: copiar lo del doc (no es lineal, va según dado!!!!)
+]
+
+
+
 # Define a few command handlers. These usually take the two arguments update and
 # context.
 def start(update: Update, context: CallbackContext) -> None:
@@ -45,6 +58,7 @@ def help_command(update: Update, context: CallbackContext) -> None:
 
 def echo(update: Update, context: CallbackContext) -> None:
     """Echo the user message."""
+    print(f"==== echo from={update.effective_user.username} {update.message.text!r}")
     update.message.reply_text(update.message.text)
 
 
@@ -55,8 +69,12 @@ def start_command(update: Update, context: CallbackContext) -> None:
     for entity, text in entities.items():
         if entity.type == MessageEntity.MENTION:
             mentions.append(text)
+    mentions.append(update.effective_user.username)  # FIXME: acá tenemos mezclados con y sin @
     print("====== mentions", mentions)
-    breakpoint()
+
+# para hablar con el usuario:
+# (Pdb) update.effective_user.send_message("Hola cacerola")
+# <telegram.message.Message object at 0x7f31001d7040>
 
 
 def main() -> None:
