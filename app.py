@@ -12,41 +12,94 @@ Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
 
+import enum
+import random
 import sys
+from collections import defaultdict
 
 import infoauth  # fades
-from telegram import Update, ForceReply, MessageEntity  # fades python-telegram-bot
+from telegram import Update, ForceReply, MessageEntity, ParseMode  # fades python-telegram-bot
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 
-DICE_TABLE = {}
+GLYPHS = {}
 for simple, squared in zip(range(65, 65 + 26), range(127280, 127280 + 26)):
-    DICE_TABLE[chr(simple)] = chr(squared)
-DICE_TABLE["CH"] = "Ch"
+    GLYPHS[chr(simple)] = chr(squared)
+GLYPHS["CH"] = "Ch"
 
-DICE_DISTRIBUTION = [
-    ("A", 5)
-    # FIXME: copiar lo del doc (no es lineal, va según dado!!!!)
+DICES = [
+    ("G", "O", "L", "D", "O", "B"),
+    ("F", "U", "A", "A", "B", "R"),
+    ("B", "T", "A", "I", "N", "A"),
+    ("B", "U", "O", "A", "E", "I"),
+    ("C", "M", "R", "E", "A", "E"),
+    ("V", "U", "Q", "D", "CH", "B"),
+    ("T", "A", "I", "O", "L", "G"),
+    ("M", "I", "B", "N", "E", "E"),
+    ("A", "X", "H", "N", "S", "J"),
+    ("CH", "O", "O", "E", "E", "U"),
+    ("J", "I", "R", "F", "S", "E"),
+    ("R", "Z", "S", "P", "L", "T"),
+    ("T", "M", "O", "F", "I", "U"),
+    ("R", "E", "S", "D", "A", "H"),
+    ("V", "U", "E", "C", "P", "O"),
+    ("T", "A", "P", "S", "C", "A"),
 ]
 
-# relaciona el mention al player
-PLAYER_BY_MENTION = {}
+# relaciona el username al player
+PLAYER_BY_USERNAME = {}
 
 # relaciona el chat al Game
 GAME_BY_CHAT = {}
 
 
+class Board:
+
+    def __init__(self):
+        # mezclamos los dados
+        random.shuffle(DICES)
+
+        self.distribution = []
+        dices = iter(DICES)
+        for i in range(4):
+            row = []
+            for j in range(4):
+                dice = next(dices)
+                row.append(random.choose(dice))
+            self.distribution.append(row)
+
+    def render(self):
+        """Prepara un mensaje para mandar el tablero a un chat."""
+
+
 class Player:
-    def __init__(self, mention, game):
-        self.mention = mention
+    def __init__(self, username, game):
+        self.username = username
         self.ready = False
         self.game = game
+        self.chat = None
 
 
 class Game:
+
+    State = enum.Enum("State", "WAITING ACTIVE FINISHED")
+
     def __init__(self, players, chat):
         self.players = players
         self.chat = chat
+        self._state = self.State.WAITING
+
+    def start(self):
+        """Arranca la ronda."""
+        self.round_words = defaultdict(list)
+        self._state = self.State.ACTIVE
+
+    def next_round(self):
+        """Vuelve a esperar a todes les jugadores antes de la próxima ronda."""
+        self._state = self.State.WAITING
+
+
+
 
 
 def start(update: Update, context: CallbackContext) -> None:
@@ -65,22 +118,29 @@ def help_command(update: Update, context: CallbackContext) -> None:
     update.message.reply_text('Help!')
 
 
-def echo(update: Update, context: CallbackContext) -> None:
-    """Echo the user message."""
-    # FIXME: esto lo vamos a modificar luego para recibir las palabras de les jugadores
-    print(f"==== echo from={update.effective_user.username} {update.message.text!r}")
-    update.message.reply_text(update.message.text)
+def game_words(update: Update, context: CallbackContext) -> None:
+    """Recibe las palabras de cada player."""
+    username = update.effective_user.username
+    word = update.message.text
+    player = PLAYER_BY_USERNAME[username]
+    player.game.round_words[username].append(word)
+    print("========== agregamos palabra", username, repr(word))
+
+    # FIXME: luego de N palabras, tirarle de nuevo el tablero así no se le va demasiado arriba
+    # update.message.reply_text()
 
 
 def start_command(update: Update, context: CallbackContext) -> None:
     """Start the game."""
     entities = update.message.parse_entities()
-    mentions = []
+    usernames = []
     for entity, text in entities.items():
         if entity.type == MessageEntity.MENTION:
-            mentions.append(text)
-    mentions.append(update.effective_user.username)  # FIXME: acá tenemos mezclados con y sin @
-    print("====== mentions", mentions)
+            if text[0] == "@":
+                text = text[1:]
+            usernames.append(text)
+    usernames.append(update.effective_user.username)
+    print("====== usernames", usernames)
 
     players = []
     chat = update.effective_chat
@@ -90,27 +150,71 @@ def start_command(update: Update, context: CallbackContext) -> None:
 
     game = Game(players, chat)
     GAME_BY_CHAT[chat] = game
-    for mention in mentions:
-        player = Player(mention, game)
+    for username in usernames:
+        player = Player(username, game)
         players.append(player)
-        PLAYER_BY_MENTION[mention] = player
-    print(f"Nuevo juego creado para el chat {chat.title!r} con los jugadores {mentions}.")
+        PLAYER_BY_USERNAME[username] = player
+    print(f"Nuevo juego creado para el chat {chat.title!r} con los jugadores {usernames}.")
     update.message.reply_text(
-        "Juego arrancado, esperando que los jugadores digan /listo **por privado**.")
+        "Juego arrancado, esperando que los jugadores digan /listo **por privado**.",
+        parse_mode=ParseMode.MARKDOWN)
+    # FIXME: este bold de acá arriba no anda :/
 
     # FIXME: acá podríamos decirle a cada jugador que le invitaron a jugar en el chat "tal" y que
     # tiene que decir /listo para arrancar -- esto va a funcionar si alguna vez el usuario le dio
     # /start al bot, y si no, no :shrug:
 
 
+def time_up(*a, **k):
+    """Se acabó el tiempo de la ronda."""
+    print("===== time up", a, k)
+    # necesitamos el juego!
+
+    # avisamos a todes por privado que listo
+    # avisamos en el público que listo
+    # hacemos "resumen" de cómo vamos (revisar el doc)
+    game.next_round()
+
+
+
+
 def ready_command(update: Update, context: CallbackContext) -> None:
     """Soporte para comando /listo."""
     # FIXME: si lo dijeron por el público, resaltar que es POR PRIVADO (para poder hablarle al jug)
-    breakpoint()  # NEXTWEEK
+    username = update.effective_user.username
 
-# para hablar con el usuario:
-# (Pdb) update.effective_user.send_message("Hola cacerola")
-# <telegram.message.Message object at 0x7f31001d7040>
+    # obtenemos el jugador y lo ponemos "listo"
+    player = PLAYER_BY_USERNAME[username]
+    player.ready = True
+    player.chat = update.effective_user
+    update.message.reply_text("Ok")
+
+    # revisamos si tenemos que esperar a más jugadores
+    game = player.game
+    remaining = [p.username for p in game.players if not p.ready]
+    print("========= esperando", remaining)
+
+    if remaining:
+        game.chat.send_message(f"{username} dijo ready, estamos esperando a {remaining}")
+        return
+
+    # arrancamos!
+    game.chat.send_message(f"{username} dijo ready, todes listes, ¡arrancamos!")
+    game.start()
+    print("========== arrrrrrrrrancamosssssS")
+
+    # creamos un tablero y lo mandamos al público y a todes les jugadores
+    board = Board()
+    print("======= nuevo tablero", board.distribution)
+    renderized = board.render()
+    game.chat.send_message(renderized)
+    for player in game.players:
+        # FIXME: revisar si esto anda
+        player.chat.send_message(renderized)
+
+    # NEXTWEEK
+    # FIXME: marcar tiempo límite
+    telegram.call_later(120, time_up)
 
 
 def main(token: str) -> None:
@@ -127,8 +231,8 @@ def main(token: str) -> None:
     dispatcher.add_handler(CommandHandler("comienzo", start_command))
     dispatcher.add_handler(CommandHandler("listo", ready_command))
 
-    # on non command i.e message - echo the message on Telegram
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
+    # para todas las palabras que tira un jugador por privado
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, game_words))
 
     # Start the Bot
     updater.start_polling()
