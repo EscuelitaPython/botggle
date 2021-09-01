@@ -16,6 +16,8 @@ import enum
 import random
 import sys
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Set
 
 import infoauth  # fades
 from telegram import Update, ForceReply, MessageEntity, ParseMode  # fades python-telegram-bot
@@ -46,11 +48,22 @@ DICES = [
     ("T", "A", "P", "S", "C", "A"),
 ]
 
+# duración de la ronda (en segundos)
+ROUND_TIMEUP = 30  # FIXME: corregir 30 a 120, o traerlo de una "config"
+
 # relaciona el username al player
 PLAYER_BY_USERNAME = {}
 
 # relaciona el chat al Game
 GAME_BY_CHAT = {}
+
+
+@dataclass
+class Words:
+    valid: Set[str]
+    repeated: Set[str]
+    not_in_language: Set[str]
+    not_in_board: Set[str]
 
 
 class Board:
@@ -65,11 +78,12 @@ class Board:
             row = []
             for j in range(4):
                 dice = next(dices)
-                row.append(random.choose(dice))
+                row.append(random.choice(dice))
             self.distribution.append(row)
 
     def render(self):
         """Prepara un mensaje para mandar el tablero a un chat."""
+        return str(self.distribution)  # FIXME: do it :)
 
 
 class Player:
@@ -88,6 +102,7 @@ class Game:
         self.players = players
         self.chat = chat
         self._state = self.State.WAITING
+        self.full_scores = defaultdict(int)
 
     def start(self):
         """Arranca la ronda."""
@@ -98,6 +113,33 @@ class Game:
         """Vuelve a esperar a todes les jugadores antes de la próxima ronda."""
         self._state = self.State.WAITING
 
+    def _evaluate_words(self):
+        """Evalúa qué palabras son válidas y marca las repetidas."""
+        print("=========== evaluarrrrrrrrr", self.round_words)
+        # FIXME: NEXTWEEK
+        # validar que la palabra sea ok diccionario
+        # validar que la palabra esté en el tablero
+        # ver cuales están repetidas en el "total"
+        # y armar el diccionario "result" con clave username y valor Word
+
+        # FIXME: result: NEXTWEEK
+        #  - diego: ["coma", "punto"]   ["   ["punno"]
+        result = {}
+
+        # ejemplo de mostrado:
+        # Diego: coma, punto (repetidas: zaraza; no en el diccionario: punno)
+        # Facundo: cumo, panto (repetidas: zaraza)
+        # Leandro: pinto (no en el tablero: xuxo; no en el diccionario: panta)
+        return result
+
+    def summarize_scores(self):
+        """Cierra la ronda, evalúa las palabras y hace el resumen de los scores."""
+        self._evaluate_words()
+
+        round_result = self._calculate_scores()
+        for player_name, round_score in round_result:
+            self.full_scores[player_name] += round_score
+        return (round_result, self.full_scores)  # FIXME: pensar qué devolvemso en función de cómo lo mostramos
 
 
 
@@ -123,6 +165,9 @@ def game_words(update: Update, context: CallbackContext) -> None:
     username = update.effective_user.username
     word = update.message.text
     player = PLAYER_BY_USERNAME[username]
+    # FIXME: si el juego está frizado, NO agregar la palabra
+
+    # FIXME: acá soportar espacios y newlines
     player.game.round_words[username].append(word)
     print("========== agregamos palabra", username, repr(word))
 
@@ -165,17 +210,26 @@ def start_command(update: Update, context: CallbackContext) -> None:
     # /start al bot, y si no, no :shrug:
 
 
-def time_up(*a, **k):
+def time_up(context):
     """Se acabó el tiempo de la ronda."""
-    print("===== time up", a, k)
-    # necesitamos el juego!
+    print("===== time up", context)
+    payload = context.job.context
+    game = payload['game']
+    game.freeze()  # NEXTWEEK implementar
 
-    # avisamos a todes por privado que listo
-    # avisamos en el público que listo
-    # hacemos "resumen" de cómo vamos (revisar el doc)
+    # FIXME: avisamos a todes por privado que listo
+
+    # avisamos en el público que terminó la ronda
+    game.chat.send_message("¡Se terminó la ronda!")
+
+    # mostrar resumen de cómo va el partido
+    # FIXME: revisar el doc
+    round_result = game.summarize_scores()
+    game.chat.send_message("¡Se terminó la ronda!")
+    game.chat.send_message(f"Progreso del juego: {round_result}")
+
+    # avanzamos el juego
     game.next_round()
-
-
 
 
 def ready_command(update: Update, context: CallbackContext) -> None:
@@ -192,7 +246,6 @@ def ready_command(update: Update, context: CallbackContext) -> None:
     # revisamos si tenemos que esperar a más jugadores
     game = player.game
     remaining = [p.username for p in game.players if not p.ready]
-    print("========= esperando", remaining)
 
     if remaining:
         game.chat.send_message(f"{username} dijo ready, estamos esperando a {remaining}")
@@ -201,20 +254,16 @@ def ready_command(update: Update, context: CallbackContext) -> None:
     # arrancamos!
     game.chat.send_message(f"{username} dijo ready, todes listes, ¡arrancamos!")
     game.start()
-    print("========== arrrrrrrrrancamosssssS")
 
     # creamos un tablero y lo mandamos al público y a todes les jugadores
     board = Board()
-    print("======= nuevo tablero", board.distribution)
     renderized = board.render()
     game.chat.send_message(renderized)
     for player in game.players:
         # FIXME: revisar si esto anda
         player.chat.send_message(renderized)
 
-    # NEXTWEEK
-    # FIXME: marcar tiempo límite
-    telegram.call_later(120, time_up)
+    context.job_queue.run_once(time_up, ROUND_TIMEUP, context={'game': game})
 
 
 def main(token: str) -> None:
