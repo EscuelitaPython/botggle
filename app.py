@@ -1,5 +1,9 @@
 #!/usr/bin/env fades
 
+# Copyright 2021 Escuelita Python
+# License: GPL-3
+# More info: https://github.com/EscuelitaPython/botggle
+
 """ Simple Bot to reply to Telegram messages.
 
 First, a few handler functions are defined. Then, those functions are passed to
@@ -23,30 +27,8 @@ import infoauth  # fades
 from telegram import Update, ForceReply, MessageEntity, ParseMode  # fades python-telegram-bot
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
+from bottgle.board import Board
 
-GLYPHS = {}
-for simple, squared in zip(range(65, 65 + 26), range(127280, 127280 + 26)):
-    GLYPHS[chr(simple)] = chr(squared)
-GLYPHS["CH"] = "Ch"
-
-DICES = [
-    ("G", "O", "L", "D", "O", "B"),
-    ("F", "U", "A", "A", "B", "R"),
-    ("B", "T", "A", "I", "N", "A"),
-    ("B", "U", "O", "A", "E", "I"),
-    ("C", "M", "R", "E", "A", "E"),
-    ("V", "U", "Q", "D", "CH", "B"),
-    ("T", "A", "I", "O", "L", "G"),
-    ("M", "I", "B", "N", "E", "E"),
-    ("A", "X", "H", "N", "S", "J"),
-    ("CH", "O", "O", "E", "E", "U"),
-    ("J", "I", "R", "F", "S", "E"),
-    ("R", "Z", "S", "P", "L", "T"),
-    ("T", "M", "O", "F", "I", "U"),
-    ("R", "E", "S", "D", "A", "H"),
-    ("V", "U", "E", "C", "P", "O"),
-    ("T", "A", "P", "S", "C", "A"),
-]
 
 # duración de la ronda (en segundos)
 ROUND_TIMEUP = 30  # FIXME: corregir 30 a 120, o traerlo de una "config"
@@ -57,6 +39,10 @@ PLAYER_BY_USERNAME = {}
 # relaciona el chat al Game
 GAME_BY_CHAT = {}
 
+# load the RAE words
+with open("rae_words.txt") as fh:
+    rae_words = {line.strip() for line in fh}
+
 
 @dataclass
 class Words:
@@ -65,25 +51,6 @@ class Words:
     not_in_language: Set[str]
     not_in_board: Set[str]
 
-
-class Board:
-
-    def __init__(self):
-        # mezclamos los dados
-        random.shuffle(DICES)
-
-        self.distribution = []
-        dices = iter(DICES)
-        for i in range(4):
-            row = []
-            for j in range(4):
-                dice = next(dices)
-                row.append(random.choice(dice))
-            self.distribution.append(row)
-
-    def render(self):
-        """Prepara un mensaje para mandar el tablero a un chat."""
-        return str(self.distribution)  # FIXME: do it :)
 
 
 class Player:
@@ -118,7 +85,11 @@ class Game:
         print("=========== evaluarrrrrrrrr", self.round_words)
         # FIXME: NEXTWEEK
         # validar que la palabra sea ok diccionario
+            word in rae_words
+
         # validar que la palabra esté en el tablero
+            self.game.board.exists(word)
+
         # ver cuales están repetidas en el "total"
         # y armar el diccionario "result" con clave username y valor Word
 
