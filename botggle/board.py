@@ -63,6 +63,26 @@ class Board:
 
     def _build_graph(self):
         """Armar el grafo con palabras."""
+        result = {}
+        for x_k in range(4):
+            for y_k in range(4):
+                key = LocatedChar(self.distribution[x_k][y_k], (x_k * 4) + y_k)
+                around = set()
+                positions = [
+                    (x_k - 1, y_k),
+                    (x_k + 1, y_k),
+                    (x_k, y_k - 1),
+                    (x_k, y_k + 1),
+                    (x_k - 1, y_k - 1),
+                    (x_k + 1, y_k + 1),
+                    (x_k - 1, y_k + 1),
+                    (x_k + 1, y_k - 1),
+                ]
+                for x_a, y_a in positions:
+                    if (0 <= x_a <= 3) and (0 <= y_a <= 3):
+                        around.add(LocatedChar(self.distribution[x_a][y_a], (x_a * 4) + y_a))
+                result[key] = around
+        return result
 
     def render(self):
         """Prepara un mensaje para mandar el tablero a un chat."""
@@ -70,7 +90,17 @@ class Board:
 
     def exists(self, word: str) -> bool:
         """Return if the word exists in the board."""
+        def search(word, to_search):
+            if len(word) == 0:
+                return True
 
+            useful_dices = [lc for lc in to_search if lc.char == word[0]]
+            for dice in useful_dices:
+                if search(word[1:], self._word_graph[dice]):
+                    return True
+            return False
+
+        return search(word, self._word_graph.keys())
 
 
 #    a  b  c  b
