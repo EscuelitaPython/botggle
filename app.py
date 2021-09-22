@@ -17,10 +17,9 @@ bot.
 """
 
 import enum
-import random
 import sys
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Set
 
 import infoauth  # fades
@@ -45,12 +44,11 @@ with open("rae_words.txt") as fh:
 
 
 @dataclass
-class Words:
-    valid: Set[str]
-    repeated: Set[str]
-    not_in_language: Set[str]
-    not_in_board: Set[str]
-
+class ResultWords:
+    valid: Set[str] = field(default_factory=set)
+    repeated: Set[str] = field(default_factory=set)
+    not_in_language: Set[str] = field(default_factory=set)
+    not_in_board: Set[str] = field(default_factory=set)
 
 
 class Player:
@@ -83,36 +81,42 @@ class Game:
     def _evaluate_words(self):
         """Evalúa qué palabras son válidas y marca las repetidas."""
         print("=========== evaluarrrrrrrrr", self.round_words)
-        # FIXME: NEXTWEEK
-        # validar que la palabra sea ok diccionario
-            word in rae_words
+        # NEXTWEEK armar tests para esto
+        full_result = {}
+        for username, words in self.round_words.items():
+            full_result[username] = result_words = ResultWords()
 
-        # validar que la palabra esté en el tablero
-            self.game.board.exists(word)
+            for word in words:
+                if word not in rae_words:
+                    # la palabra no está en el diccionario
+                    result_words.not_in_language.add(word)
+                elif not self.game.board.exists(word):
+                    # la palabra no está en el tablero
+                    result_words.not_in_board.add(word)
+                else:
+                    result_words.valid.add(word)
+            print("=========== result words for user", username, result_words)
 
-        # ver cuales están repetidas en el "total"
-        # y armar el diccionario "result" con clave username y valor Word
-
-        # FIXME: result: NEXTWEEK
-        #  - diego: ["coma", "punto"]   ["   ["punno"]
-        result = {}
+        # FIXME: falta agarrar todas las valid, ver cuales están repetidas, y para cada jugador
+        # fixear su ".valid" y su ".repetated" para expresar esto
 
         # ejemplo de mostrado:
         # Diego: coma, punto (repetidas: zaraza; no en el diccionario: punno)
         # Facundo: cumo, panto (repetidas: zaraza)
         # Leandro: pinto (no en el tablero: xuxo; no en el diccionario: panta)
-        return result
+        return full_result
 
     def summarize_scores(self):
         """Cierra la ronda, evalúa las palabras y hace el resumen de los scores."""
-        self._evaluate_words()
+        # FIXME NEXTWEEK : ver si desde afuera llamamos a "evaluate words" (y nos quedamos con
+        # ese resultado) y tambien se lo pasamos a caluclate scores para que nos de puntajes
+        # de ronda y totales
+        user_words = self._evaluate_words()
 
-        round_result = self._calculate_scores()
+        round_result = self._calculate_scores(user_words)
         for player_name, round_score in round_result:
             self.full_scores[player_name] += round_score
-        return (round_result, self.full_scores)  # FIXME: pensar qué devolvemso en función de cómo lo mostramos
-
-
+        return (user_words, round_result, self.full_scores)
 
 
 def start(update: Update, context: CallbackContext) -> None:

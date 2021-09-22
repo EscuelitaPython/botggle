@@ -65,11 +65,16 @@ def test_exists_simple_missing(monkeypatch):
     ("holas", False),
     ("ablx", True),
     ("ablxa", True),
-    ("ablxab", False),  # NEXTWEEK
-    ("ablxb", False),  # NEXTWEEK
-    ("ablxba", False),  # NEXTWEEK
+    ("ablxab", False),
+    ("ablxb", False),
+    ("ablxba", False),
     ("cdab", False),
-    ("ababababababababab", False),  # NEXTWEEK
+    ("ababababababababab", False),
+    ("ablax", False),
+    ("abcdqzlx", True),
+    ("abcdqzlxa", True),
+    ("abcdqzlxab", False),
+    ("abcdqzblx", False),
 ])
 def test_exists_case_1(monkeypatch, word, expected):
     distribution = [
