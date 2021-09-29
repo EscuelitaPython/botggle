@@ -16,17 +16,14 @@ Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
 
-import enum
 import sys
-from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import Set
 
 import infoauth  # fades
 from telegram import Update, ForceReply, MessageEntity, ParseMode  # fades python-telegram-bot
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 from bottgle.board import Board
+from bottgle.game import Game
 
 
 # duración de la ronda (en segundos)
@@ -38,18 +35,6 @@ PLAYER_BY_USERNAME = {}
 # relaciona el chat al Game
 GAME_BY_CHAT = {}
 
-# load the RAE words
-with open("rae_words.txt") as fh:
-    rae_words = {line.strip() for line in fh}
-
-
-@dataclass
-class ResultWords:
-    valid: Set[str] = field(default_factory=set)
-    repeated: Set[str] = field(default_factory=set)
-    not_in_language: Set[str] = field(default_factory=set)
-    not_in_board: Set[str] = field(default_factory=set)
-
 
 class Player:
     def __init__(self, username, game):
@@ -57,66 +42,6 @@ class Player:
         self.ready = False
         self.game = game
         self.chat = None
-
-
-class Game:
-
-    State = enum.Enum("State", "WAITING ACTIVE FINISHED")
-
-    def __init__(self, players, chat):
-        self.players = players
-        self.chat = chat
-        self._state = self.State.WAITING
-        self.full_scores = defaultdict(int)
-
-    def start(self):
-        """Arranca la ronda."""
-        self.round_words = defaultdict(list)
-        self._state = self.State.ACTIVE
-
-    def next_round(self):
-        """Vuelve a esperar a todes les jugadores antes de la próxima ronda."""
-        self._state = self.State.WAITING
-
-    def _evaluate_words(self):
-        """Evalúa qué palabras son válidas y marca las repetidas."""
-        print("=========== evaluarrrrrrrrr", self.round_words)
-        # NEXTWEEK armar tests para esto
-        full_result = {}
-        for username, words in self.round_words.items():
-            full_result[username] = result_words = ResultWords()
-
-            for word in words:
-                if word not in rae_words:
-                    # la palabra no está en el diccionario
-                    result_words.not_in_language.add(word)
-                elif not self.game.board.exists(word):
-                    # la palabra no está en el tablero
-                    result_words.not_in_board.add(word)
-                else:
-                    result_words.valid.add(word)
-            print("=========== result words for user", username, result_words)
-
-        # FIXME: falta agarrar todas las valid, ver cuales están repetidas, y para cada jugador
-        # fixear su ".valid" y su ".repetated" para expresar esto
-
-        # ejemplo de mostrado:
-        # Diego: coma, punto (repetidas: zaraza; no en el diccionario: punno)
-        # Facundo: cumo, panto (repetidas: zaraza)
-        # Leandro: pinto (no en el tablero: xuxo; no en el diccionario: panta)
-        return full_result
-
-    def summarize_scores(self):
-        """Cierra la ronda, evalúa las palabras y hace el resumen de los scores."""
-        # FIXME NEXTWEEK : ver si desde afuera llamamos a "evaluate words" (y nos quedamos con
-        # ese resultado) y tambien se lo pasamos a caluclate scores para que nos de puntajes
-        # de ronda y totales
-        user_words = self._evaluate_words()
-
-        round_result = self._calculate_scores(user_words)
-        for player_name, round_score in round_result:
-            self.full_scores[player_name] += round_score
-        return (user_words, round_result, self.full_scores)
 
 
 def start(update: Update, context: CallbackContext) -> None:
@@ -138,13 +63,10 @@ def help_command(update: Update, context: CallbackContext) -> None:
 def game_words(update: Update, context: CallbackContext) -> None:
     """Recibe las palabras de cada player."""
     username = update.effective_user.username
-    word = update.message.text
+    text = update.message.text
     player = PLAYER_BY_USERNAME[username]
-    # FIXME: si el juego está frizado, NO agregar la palabra
-
-    # FIXME: acá soportar espacios y newlines
-    player.game.round_words[username].append(word)
-    print("========== agregamos palabra", username, repr(word))
+    player.game.add_text(username, text)
+    print("========== agregamos palabra", username, repr(text))
 
     # FIXME: luego de N palabras, tirarle de nuevo el tablero así no se le va demasiado arriba
     # update.message.reply_text()
@@ -190,7 +112,7 @@ def time_up(context):
     print("===== time up", context)
     payload = context.job.context
     game = payload['game']
-    game.freeze()  # NEXTWEEK implementar
+    game.end_round()
 
     # FIXME: avisamos a todes por privado que listo
 
@@ -198,12 +120,23 @@ def time_up(context):
     game.chat.send_message("¡Se terminó la ronda!")
 
     # mostrar resumen de cómo va el partido
-    # FIXME: revisar el doc
-    round_result = game.summarize_scores()
+    user_words = game.evaluate_words()
+    round_scores = game.summarize_scores(user_words)
     game.chat.send_message("¡Se terminó la ronda!")
-    game.chat.send_message(f"Progreso del juego: {round_result}")
+
+    # FIXME: mostrar esto lindo
+    game.chat.send_message(f"Como le fue a cada une: {user_words}")
+    # ejemplo de mostrado:
+    # Diego: coma, punto (repetidas: zaraza; no en el diccionario: punno)
+    # Facundo: cumo, panto (repetidas: zaraza)
+    # Leandro: pinto (no en el tablero: xuxo; no en el diccionario: panta)
+
+    # FIXME: mostrar esto lindo
+    game.chat.send_message(f"Progreso del juego: {round_scores} {game.full_scores}")
 
     # avanzamos el juego
+    # FIXME: en algun momento tomar la decision de que el partido entero terminó y no hay
+    # próxima ronda
     game.next_round()
 
 
