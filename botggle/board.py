@@ -57,7 +57,7 @@ class Board:
             row = []
             for j in range(4):
                 dice = next(dices)
-                row.append(random.choice(dice))
+                row.append(random.choice(dice).lower())
             distribution.append(row)
         return distribution
 

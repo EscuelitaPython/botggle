@@ -23,7 +23,7 @@ from telegram import Update, ForceReply, MessageEntity, ParseMode  # fades pytho
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 from bottgle.board import Board
-from bottgle.game import Game
+from bottgle.game import Game, NotActiveError
 
 
 # duración de la ronda (en segundos)
@@ -65,8 +65,14 @@ def game_words(update: Update, context: CallbackContext) -> None:
     username = update.effective_user.username
     text = update.message.text
     player = PLAYER_BY_USERNAME[username]
-    player.game.add_text(username, text)
-    print("========== agregamos palabra", username, repr(text))
+    try:
+        player.game.add_text(username, text)
+    except NotActiveError:
+        # FIXME: decirle al usuario qu esa palabra entró cuando la ronda
+        # había terminado
+        print("====== palabra fuera de orden", username, repr(text))
+    else:
+        print("========== agregamos palabra", username, repr(text))
 
     # FIXME: luego de N palabras, tirarle de nuevo el tablero así no se le va demasiado arriba
     # update.message.reply_text()

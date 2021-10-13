@@ -44,6 +44,13 @@ def test_graph_simple(monkeypatch):
     assert b._word_graph == expected
 
 
+def test_real_board_in_lowercase():
+    b = Board()
+    for line in b.distribution:
+        for char in line:
+            assert char.islower()
+
+
 def test_exists_simple_missing(monkeypatch):
     distribution = [
         list("abcd"),

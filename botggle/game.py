@@ -19,6 +19,10 @@ class TransitionError(Exception):
     """Transición inválida en la máquina de estados de Game."""
 
 
+class NotActiveError(Exception):
+    """Se intentó alguna acción que sólo podía hacerse en estado ACTIVE."""
+
+
 @dataclass
 class ResultWords:
     valid: Set[str] = field(default_factory=set)
@@ -31,11 +35,16 @@ class Game:
     """Representa un juego completo, que se compone por varias rondas."""
 
     State = enum.Enum("State", "WAITING ACTIVE STOPPED")
+    _cleaning_table = str.maketrans(
+        """.,;:'"-_=+[]{}áéíóú""",
+        """              aeiou""",
+    )
 
     def __init__(self, players, chat):
         self.players = players
         self._state = self.State.WAITING
         self.full_scores = defaultdict(int)
+        self.round_words = defaultdict(set)
 
         # no lo usamos internamente, pero lo guardamos acá porque es el
         # grupo público donde el juego fue arrancado
@@ -45,7 +54,7 @@ class Game:
         """Arranca la ronda."""
         if self._state != self.State.WAITING:
             raise TransitionError("Start sin estar en WAITING")
-        self.round_words = defaultdict(list)
+        self.round_words = defaultdict(set)
         self._state = self.State.ACTIVE
 
     def next_round(self):
@@ -58,14 +67,16 @@ class Game:
         """Termina la ronda (para dejar de recibir palabras)."""
         if self._state != self.State.ACTIVE:
             raise TransitionError("Stop round sin estar en ACTIVE")
-        # FIXME: implementar
+        self._state = self.State.STOPPED
 
     def add_text(self, username, text):
         """Agrega una o más palabras a le usuarie si la ronda no está frenada."""
-        # FIXME: revisar ronda
-        # FIXME: acá soportar espacios y newlines
-        if not self.frozen:
-            self.round_words[username].append(word)
+        if self._state != self.State.ACTIVE:
+            raise NotActiveError(f"Se intentó agregar texto cuando el estado es {self._state}")
+
+        text = text.translate(self._cleaning_table)
+        for word in text.split():
+            self.round_words[username].add(word)
 
     def evaluate_words(self):
         """Evalúa qué palabras son válidas y marca las repetidas."""
@@ -93,6 +104,7 @@ class Game:
 
     def summarize_scores(self, user_words):
         """Cierra la ronda, evalúa las palabras y hace el resumen de los scores."""
+        # NEXTWEEK armar tests para esto
         round_result = self._calculate_scores(user_words)
         for player_name, round_score in round_result:
             self.full_scores[player_name] += round_score
