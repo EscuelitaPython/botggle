@@ -165,12 +165,12 @@ def ready_command(update: Update, context: CallbackContext) -> None:
         game.chat.send_message(f"{username} dijo ready, estamos esperando a {remaining}")
         return
 
-    # arrancamos!
+    # arrancamos! avisamos, creamos un nuevo tablero para la ronda y se lo pasamos a game
     game.chat.send_message(f"{username} dijo ready, todes listes, ¡arrancamos!")
-    game.start()
+    board = Board()
+    game.start(board)
 
     # creamos un tablero y lo mandamos al público y a todes les jugadores
-    board = Board()
     renderized = board.render()
     game.chat.send_message(renderized)
     for player in game.players:

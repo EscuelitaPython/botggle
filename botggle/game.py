@@ -5,6 +5,7 @@
 """The Game class and a couple of helpers."""
 
 import enum
+import itertools
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Set
@@ -45,15 +46,17 @@ class Game:
         self._state = self.State.WAITING
         self.full_scores = defaultdict(int)
         self.round_words = defaultdict(set)
+        self.board = None
 
         # no lo usamos internamente, pero lo guardamos acá porque es el
         # grupo público donde el juego fue arrancado
         self.chat = chat
 
-    def start_round(self):
+    def start_round(self, board):
         """Arranca la ronda."""
         if self._state != self.State.WAITING:
             raise TransitionError("Start sin estar en WAITING")
+        self.board = board
         self.round_words = defaultdict(set)
         self._state = self.State.ACTIVE
 
@@ -74,14 +77,13 @@ class Game:
         if self._state != self.State.ACTIVE:
             raise NotActiveError(f"Se intentó agregar texto cuando el estado es {self._state}")
 
+        text = text.lower()
         text = text.translate(self._cleaning_table)
         for word in text.split():
             self.round_words[username].add(word)
 
     def evaluate_words(self):
         """Evalúa qué palabras son válidas y marca las repetidas."""
-        print("=========== evaluarrrrrrrrr", self.round_words)
-        # NEXTWEEK armar tests para esto
         full_result = {}
         for username, words in self.round_words.items():
             full_result[username] = result_words = ResultWords()
@@ -90,22 +92,31 @@ class Game:
                 if word not in rae_words:
                     # la palabra no está en el diccionario
                     result_words.not_in_language.add(word)
-                elif not self.game.board.exists(word):
+                elif not self.board.exists(word):
                     # la palabra no está en el tablero
                     result_words.not_in_board.add(word)
                 else:
                     result_words.valid.add(word)
-            print("=========== result words for user", username, result_words)
 
-        # FIXME: falta agarrar todas las valid, ver cuales están repetidas, y para cada jugador
-        # fixear su ".valid" y su ".repetated" para expresar esto
+        for rword1, rword2 in itertools.combinations(full_result.values(), 2):
+            repes = rword1.valid & rword2.valid
+            rword1.repeated.update(repes)
+            rword2.repeated.update(repes)
+
+        for rword in full_result.values():
+            rword.valid -= rword.repeated
 
         return full_result
 
+    def _calculate_scores(self, result_words):
+        """Devuelve el puntaje total para una lista de palabras válidas."""
+        # NEXTWEEK: implementar
+
     def summarize_scores(self, user_words):
         """Cierra la ronda, evalúa las palabras y hace el resumen de los scores."""
-        # NEXTWEEK armar tests para esto
-        round_result = self._calculate_scores(user_words)
-        for player_name, round_score in round_result:
-            self.full_scores[player_name] += round_score
+        round_result = {}
+        for username, result_words in user_words:
+            round_score = self._calculate_scores(result_words)
+            round_result[username] = round_score
+            self.full_scores[username] += round_score
         return round_result
