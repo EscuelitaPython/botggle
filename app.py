@@ -22,12 +22,15 @@ import infoauth  # fades
 from telegram import Update, ForceReply, MessageEntity, ParseMode  # fades python-telegram-bot
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-from bottgle.board import Board
-from bottgle.game import Game, NotActiveError
+from botggle.board import Board
+from botggle.game import Game, NotActiveError
 
 
 # duración de la ronda (en segundos)
 ROUND_TIMEUP = 30  # FIXME: corregir 30 a 120, o traerlo de una "config"
+
+# duración del juego en puntos
+SCORES_GAME_LIMIT = 50
 
 # relaciona el username al player
 PLAYER_BY_USERNAME = {}
@@ -64,7 +67,11 @@ def game_words(update: Update, context: CallbackContext) -> None:
     """Recibe las palabras de cada player."""
     username = update.effective_user.username
     text = update.message.text
-    player = PLAYER_BY_USERNAME[username]
+    player = PLAYER_BY_USERNAME.get(username)
+    if player is None:
+        print(f"==== ignoramos al usuario {username} por hablar fuera de orden")
+        return
+
     try:
         player.game.add_text(username, text)
     except NotActiveError:
@@ -118,7 +125,7 @@ def time_up(context):
     print("===== time up", context)
     payload = context.job.context
     game = payload['game']
-    game.end_round()
+    game.stop_round()
 
     # FIXME: avisamos a todes por privado que listo
 
@@ -128,7 +135,6 @@ def time_up(context):
     # mostrar resumen de cómo va el partido
     user_words = game.evaluate_words()
     round_scores = game.summarize_scores(user_words)
-    game.chat.send_message("¡Se terminó la ronda!")
 
     # FIXME: mostrar esto lindo
     game.chat.send_message(f"Como le fue a cada une: {user_words}")
@@ -141,9 +147,13 @@ def time_up(context):
     game.chat.send_message(f"Progreso del juego: {round_scores} {game.full_scores}")
 
     # avanzamos el juego
-    # FIXME: en algun momento tomar la decision de que el partido entero terminó y no hay
-    # próxima ronda
-    game.next_round()
+    if max(game.full_scores.values()) < SCORES_GAME_LIMIT:
+        # FIXME: avisar a todes (POR PRIVADO!!!) que estamos listos para la próxima ronda
+        game.next_round()
+        return
+
+    print("========== ganó FULANO!!!")
+    # FIXME: mostrar bien quien ganó, y terminar el juego (onda game.finish()???)
 
 
 def ready_command(update: Update, context: CallbackContext) -> None:
@@ -153,6 +163,8 @@ def ready_command(update: Update, context: CallbackContext) -> None:
 
     # obtenemos el jugador y lo ponemos "listo"
     player = PLAYER_BY_USERNAME[username]
+    # FIXME: limpiar que los jugadores están "listos" entre ronda y ronda
+    # NEXTWEEK ^
     player.ready = True
     player.chat = update.effective_user
     update.message.reply_text("Ok")
@@ -168,7 +180,7 @@ def ready_command(update: Update, context: CallbackContext) -> None:
     # arrancamos! avisamos, creamos un nuevo tablero para la ronda y se lo pasamos a game
     game.chat.send_message(f"{username} dijo ready, todes listes, ¡arrancamos!")
     board = Board()
-    game.start(board)
+    game.start_round(board)
 
     # creamos un tablero y lo mandamos al público y a todes les jugadores
     renderized = board.render()
@@ -193,6 +205,7 @@ def main(token: str) -> None:
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("comienzo", start_command))
     dispatcher.add_handler(CommandHandler("listo", ready_command))
+    # FIXME: implementar un "terminar" para cancelar el juego
 
     # para todas las palabras que tira un jugador por privado
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, game_words))

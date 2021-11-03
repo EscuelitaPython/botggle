@@ -274,20 +274,79 @@ def test_evaluate_repeated_valid(monkeypatch):
 
 # -- pruebas de resumir puntajes
 
-    # NEXTWEEK terminar los tests
+def test_summarize_simple(monkeypatch):
+    game = Game([], "chat")
+    game._calculate_scores = lambda *a: 5
 
-def test_summarize_simple():
-    # FIXME patchear calcuale_scores, y testear que devuelva lo de la ronda y que agrupe en "full"
-    fixme
+    rw = ResultWords(
+        valid={"foo"}, repeated=set(), not_in_language=set(), not_in_board=set())
+    user_words = {"juan": rw}
+
+    scores = game.summarize_scores(user_words)
+    assert scores == {"juan": 5}
+    assert game.full_scores == {"juan": 5}
+
+    scores = game.summarize_scores(user_words)
+    assert scores == {"juan": 5}
+    assert game.full_scores == {"juan": 10}
 
 
 def test_summarize_double():
-    # FIXME lo mismo de arriba pero para dos jugadores así vemos que no mezclamos
-    fixme
+    game = Game([], "chat")
+    game._calculate_scores = lambda *a: 5
+
+    rw = ResultWords(
+        valid={"foo"}, repeated=set(), not_in_language=set(), not_in_board=set())
+
+    user_words = {"juan": rw}
+    scores = game.summarize_scores(user_words)
+    assert scores == {"juan": 5}
+    assert game.full_scores == {"juan": 5}
+
+    user_words = {"mara": rw, "juan": rw}
+    scores = game.summarize_scores(user_words)
+    assert scores == {"mara": 5, "juan": 5}
+    assert game.full_scores == {"juan": 10, "mara": 5}
 
 
-def test_scores_FIXME():
-    # FIXME: ver qué tenemos que testear (LEER EL DOCUMENTO A VER COMO SON LOS SCORES)
-    fixme
+@pytest.mark.parametrize("length", [0, 1, 2])
+def test_scores_too_short(length):
+    rw = ResultWords(
+        valid={"x" * length}, repeated=set(), not_in_language=set(), not_in_board=set())
+    game = Game([], "chat")
+    score = game._calculate_scores(rw)
+    assert score == 0
 
 
+def test_scores_not_valid():
+    rw = ResultWords(
+        valid=set(), repeated={"foobar"}, not_in_language={"foobar"}, not_in_board={"foobar"})
+    game = Game([], "chat")
+    score = game._calculate_scores(rw)
+    assert score == 0
+
+
+def test_scores_too_long():
+    rw = ResultWords(
+        valid={"x" * 123}, repeated=set(), not_in_language=set(), not_in_board=set())
+    game = Game([], "chat")
+    score = game._calculate_scores(rw)
+    assert score == 79
+
+
+def test_scores_intermediate(monkeypatch):
+    monkeypatch.setattr(botggle.game, "SCORES_TABLE", {6: 123})
+    rw = ResultWords(
+        valid={"foobar"}, repeated=set(), not_in_language=set(), not_in_board=set())
+    game = Game([], "chat")
+    score = game._calculate_scores(rw)
+    assert score == 123
+
+
+def test_scores_accumulates(monkeypatch):
+    monkeypatch.setattr(botggle.game, "SCORES_TABLE", {6: 123, 3: 15})
+    rw = ResultWords(
+        valid={"foobar", "yes"}, repeated=set(), not_in_language=set(), not_in_board=set())
+    game = Game([], "chat")
+    score = game._calculate_scores(rw)
+    assert score == 138

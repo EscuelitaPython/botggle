@@ -10,6 +10,24 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Set
 
+SCORES_TABLE = {
+    3: 1,
+    4: 2,
+    5: 4,
+    6: 7,
+    7: 11,
+    8: 16,
+    9: 22,
+    10: 29,
+    11: 37,
+    12: 46,
+    13: 56,
+    14: 67,
+}
+MIN_WORD_LENGTH = min(SCORES_TABLE)
+MAX_WORD_LENGTH = max(SCORES_TABLE)
+MAX_WORD_SCORE = 79
+
 
 # load the RAE words
 with open("rae_words.txt") as fh:
@@ -110,12 +128,18 @@ class Game:
 
     def _calculate_scores(self, result_words):
         """Devuelve el puntaje total para una lista de palabras válidas."""
-        # NEXTWEEK: implementar
+        score = 0
+        for word in result_words.valid:
+            if len(word) > MAX_WORD_LENGTH:
+                score += MAX_WORD_SCORE
+            else:
+                score += SCORES_TABLE.get(len(word), 0)
+        return score
 
     def summarize_scores(self, user_words):
         """Cierra la ronda, evalúa las palabras y hace el resumen de los scores."""
         round_result = {}
-        for username, result_words in user_words:
+        for username, result_words in user_words.items():
             round_score = self._calculate_scores(result_words)
             round_result[username] = round_score
             self.full_scores[username] += round_score

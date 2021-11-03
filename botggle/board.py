@@ -103,12 +103,14 @@ class Board:
 
     def render(self):
         """Prepara un mensaje para mandar el tablero a un chat."""
+        # NEXTWEEK hacer eso
         return str(self.distribution)  # FIXME: armarlo para que salga
 
     def exists(self, word: str) -> bool:
         """Return if the word exists in the board."""
         # FIXME: este algoritmo se rompe para palabras que tengan "CH" y que pasen por un
         # dado con "CH" (no dos con "C" y "H")
+        # FIXME: tambien pensar en las palabras con Q y U
         def search(word, to_search, chain):
             """Función recursiva para encontrar los próx. dados para seguir hilando la palabra."""
             if len(word) == 0:
