@@ -8,27 +8,27 @@ import dataclasses
 import random
 
 GLYPHS = {}
-for simple, squared in zip(range(65, 65 + 26), range(127280, 127280 + 26)):
+for simple, squared in zip(range(97, 97 + 26), range(127280, 127280 + 26)):
     GLYPHS[chr(simple)] = chr(squared)
-GLYPHS["CH"] = "Ch"
+GLYPHS["ch"] = "Ch"
 
 DICES = [
-    ("G", "O", "L", "D", "O", "B"),
-    ("F", "U", "A", "A", "B", "R"),
-    ("B", "T", "A", "I", "N", "A"),
-    ("B", "U", "O", "A", "E", "I"),
-    ("C", "M", "R", "E", "A", "E"),
-    ("V", "U", "Q", "D", "CH", "B"),
-    ("T", "A", "I", "O", "L", "G"),
-    ("M", "I", "B", "N", "E", "E"),
-    ("A", "X", "H", "N", "S", "J"),
-    ("CH", "O", "O", "E", "E", "U"),
-    ("J", "I", "R", "F", "S", "E"),
-    ("R", "Z", "S", "P", "L", "T"),
-    ("T", "M", "O", "F", "I", "U"),
-    ("R", "E", "S", "D", "A", "H"),
-    ("V", "U", "E", "C", "P", "O"),
-    ("T", "A", "P", "S", "C", "A"),
+    ("g", "o", "l", "d", "o", "b"),
+    ("f", "u", "a", "a", "b", "r"),
+    ("b", "t", "a", "i", "n", "a"),
+    ("b", "u", "o", "a", "e", "i"),
+    ("c", "m", "r", "e", "a", "e"),
+    ("v", "u", "q", "d", "ch", "b"),
+    ("t", "a", "i", "o", "l", "g"),
+    ("m", "i", "b", "n", "e", "e"),
+    ("a", "x", "h", "n", "s", "j"),
+    ("ch", "o", "o", "e", "e", "u"),
+    ("j", "i", "r", "f", "s", "e"),
+    ("r", "z", "s", "p", "l", "t"),
+    ("t", "m", "o", "f", "i", "u"),
+    ("r", "e", "s", "d", "a", "h"),
+    ("v", "u", "e", "c", "p", "o"),
+    ("t", "a", "p", "s", "c", "a"),
 ]
 
 
@@ -57,7 +57,7 @@ class Board:
             row = []
             for j in range(4):
                 dice = next(dices)
-                row.append(random.choice(dice).lower())
+                row.append(random.choice(dice))
             distribution.append(row)
         return distribution
 
@@ -103,8 +103,12 @@ class Board:
 
     def render(self):
         """Prepara un mensaje para mandar el tablero a un chat."""
-        # NEXTWEEK hacer eso
-        return str(self.distribution)  # FIXME: armarlo para que salga
+        result_lines = []
+        for dist_line in self.distribution:
+            # line = [GLYPHS[char] for char in dist_line]
+            line = [char.upper() for char in dist_line]
+            result_lines.append("  ".join(line))
+        return "\n".join(result_lines) + "\n"
 
     def exists(self, word: str) -> bool:
         """Return if the word exists in the board."""

@@ -1,5 +1,9 @@
 """Tests for the board module."""
 
+import string
+import textwrap
+
+from botggle import board
 from botggle.board import Board, LocatedChar as LC
 
 import pytest
@@ -95,3 +99,23 @@ def test_exists_case_1(monkeypatch, word, expected):
     b = Board()
     result = b.exists(word)
     assert result is expected
+
+
+def test_render(monkeypatch):
+    fake_glifos = dict(zip(string.ascii_lowercase, string.ascii_uppercase))
+    monkeypatch.setattr(board, 'GLYPHS', fake_glifos)
+    b = Board()
+    b.distribution = [
+        ['a', 'u', 'x', 'f'],
+        ['t', 'i', 'g', 'r'],
+        ['o', 'e', 'f', 's'],
+        ['i', 'e', 'e', 'c']
+    ]
+    rendered = b.render()
+    expected = textwrap.dedent("""\
+        A U X F
+        T I G R
+        O E F S
+        I E E C
+    """)
+    assert rendered == expected

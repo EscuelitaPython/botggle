@@ -42,6 +42,14 @@ class NotActiveError(Exception):
     """Se intentó alguna acción que sólo podía hacerse en estado ACTIVE."""
 
 
+class Player:
+    def __init__(self, username, game):
+        self.username = username
+        self.ready = False
+        self.game = game
+        self.chat = None
+
+
 @dataclass
 class ResultWords:
     valid: Set[str] = field(default_factory=set)
@@ -62,7 +70,7 @@ class Game:
     def __init__(self, players, chat):
         self.players = players
         self._state = self.State.WAITING
-        self.full_scores = defaultdict(int)
+        self.full_scores = {player.username: 0 for player in players}
         self.round_words = defaultdict(set)
         self.board = None
 
@@ -83,6 +91,8 @@ class Game:
         if self._state != self.State.STOPPED:
             raise TransitionError("Next round sin estar en STOPPED")
         self._state = self.State.WAITING
+        for player in self.players:
+            player.ready = False
 
     def stop_round(self):
         """Termina la ronda (para dejar de recibir palabras)."""

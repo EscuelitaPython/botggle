@@ -23,7 +23,7 @@ from telegram import Update, ForceReply, MessageEntity, ParseMode  # fades pytho
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 from botggle.board import Board
-from botggle.game import Game, NotActiveError
+from botggle.game import Game, NotActiveError, Player
 
 
 # duración de la ronda (en segundos)
@@ -37,14 +37,6 @@ PLAYER_BY_USERNAME = {}
 
 # relaciona el chat al Game
 GAME_BY_CHAT = {}
-
-
-class Player:
-    def __init__(self, username, game):
-        self.username = username
-        self.ready = False
-        self.game = game
-        self.chat = None
 
 
 def start(update: Update, context: CallbackContext) -> None:
@@ -109,7 +101,16 @@ def start_command(update: Update, context: CallbackContext) -> None:
         player = Player(username, game)
         players.append(player)
         PLAYER_BY_USERNAME[username] = player
+    # NEXTWEEK
+    # refactorear
+    # game.add_player(username)
+    #   - que cree un Player con (username, self)
+    #   - que se agregue internamente ese Player
+    #   - que lo agregue a "fulls_scores"
+    #   - que lo devuelva porque se usa desde afuera
+
     print(f"Nuevo juego creado para el chat {chat.title!r} con los jugadores {usernames}.")
+    print("======= full scores", game.full_scores)
     update.message.reply_text(
         "Juego arrancado, esperando que los jugadores digan /listo **por privado**.",
         parse_mode=ParseMode.MARKDOWN)
@@ -147,7 +148,7 @@ def time_up(context):
     game.chat.send_message(f"Progreso del juego: {round_scores} {game.full_scores}")
 
     # avanzamos el juego
-    if max(game.full_scores.values()) < SCORES_GAME_LIMIT:
+    if max(game.full_scores.values(), default=0) < SCORES_GAME_LIMIT:
         # FIXME: avisar a todes (POR PRIVADO!!!) que estamos listos para la próxima ronda
         game.next_round()
         return
@@ -155,16 +156,24 @@ def time_up(context):
     print("========== ganó FULANO!!!")
     # FIXME: mostrar bien quien ganó, y terminar el juego (onda game.finish()???)
 
+    # limpiamos las globales
+    del GAME_BY_CHAT[game.chat]
+    for player in game.players:
+        del PLAYER_BY_USERNAME[player.username]
+
 
 def ready_command(update: Update, context: CallbackContext) -> None:
     """Soporte para comando /listo."""
     # FIXME: si lo dijeron por el público, resaltar que es POR PRIVADO (para poder hablarle al jug)
     username = update.effective_user.username
+    print(f"El usuario {username} dijo listo")
 
     # obtenemos el jugador y lo ponemos "listo"
-    player = PLAYER_BY_USERNAME[username]
-    # FIXME: limpiar que los jugadores están "listos" entre ronda y ronda
-    # NEXTWEEK ^
+    try:
+        player = PLAYER_BY_USERNAME[username]
+    except KeyError:
+        update.message.reply_text("No hay un juego activo o no te invitaron :(")
+        return
     player.ready = True
     player.chat = update.effective_user
     update.message.reply_text("Ok")

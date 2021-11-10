@@ -6,7 +6,7 @@
 
 import botggle.game
 from botggle.board import Board
-from botggle.game import Game, TransitionError, NotActiveError, ResultWords
+from botggle.game import Game, TransitionError, NotActiveError, ResultWords, Player
 
 import pytest
 
@@ -43,11 +43,16 @@ def test_lifecycle_start_when_stopped():
 
 
 def test_lifecycle_next_round_when_stopped():
-    game = Game([], "chat")
+    p1 = Player("maria", "fakegame")
+    p1.ready = False
+    p2 = Player("juan", "fakegame")
+    p2.ready = True
+    game = Game([p1, p2], "chat")
     game.start_round(Board())
     game.stop_round()
     game.next_round()
     assert game._state == Game.State.WAITING
+    assert all(not p.ready for p in game.players)
 
 
 def test_lifecycle_next_round_when_active():
@@ -275,7 +280,8 @@ def test_evaluate_repeated_valid(monkeypatch):
 # -- pruebas de resumir puntajes
 
 def test_summarize_simple(monkeypatch):
-    game = Game([], "chat")
+    players = [Player("juan", "fakegame")]
+    game = Game(players, "chat")
     game._calculate_scores = lambda *a: 5
 
     rw = ResultWords(
@@ -292,7 +298,8 @@ def test_summarize_simple(monkeypatch):
 
 
 def test_summarize_double():
-    game = Game([], "chat")
+    players = [Player("juan", "fakegame"), Player("mara", "fakegame")]
+    game = Game(players, "chat")
     game._calculate_scores = lambda *a: 5
 
     rw = ResultWords(
@@ -301,7 +308,7 @@ def test_summarize_double():
     user_words = {"juan": rw}
     scores = game.summarize_scores(user_words)
     assert scores == {"juan": 5}
-    assert game.full_scores == {"juan": 5}
+    assert game.full_scores == {"juan": 5, "mara": 0}
 
     user_words = {"mara": rw, "juan": rw}
     scores = game.summarize_scores(user_words)
