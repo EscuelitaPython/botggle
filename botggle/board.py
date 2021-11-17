@@ -7,18 +7,13 @@
 import dataclasses
 import random
 
-GLYPHS = {}
-for simple, squared in zip(range(97, 97 + 26), range(127280, 127280 + 26)):
-    GLYPHS[chr(simple)] = chr(squared)
-GLYPHS["ch"] = "Ch"
-
 DICES = [
     ("g", "o", "l", "d", "o", "b"),
     ("f", "u", "a", "a", "b", "r"),
     ("b", "t", "a", "i", "n", "a"),
     ("b", "u", "o", "a", "e", "i"),
     ("c", "m", "r", "e", "a", "e"),
-    ("v", "u", "q", "d", "ch", "b"),
+    ("v", "u", "qu", "d", "ch", "b"),
     ("t", "a", "i", "o", "l", "g"),
     ("m", "i", "b", "n", "e", "e"),
     ("a", "x", "h", "n", "s", "j"),
@@ -103,9 +98,9 @@ class Board:
 
     def render(self):
         """Prepara un mensaje para mandar el tablero a un chat."""
+        # FIXME: que esto genere una imagen que simule los daditos
         result_lines = []
         for dist_line in self.distribution:
-            # line = [GLYPHS[char] for char in dist_line]
             line = [char.upper() for char in dist_line]
             result_lines.append("  ".join(line))
         return "\n".join(result_lines) + "\n"
@@ -114,7 +109,7 @@ class Board:
         """Return if the word exists in the board."""
         # FIXME: este algoritmo se rompe para palabras que tengan "CH" y que pasen por un
         # dado con "CH" (no dos con "C" y "H")
-        # FIXME: tambien pensar en las palabras con Q y U
+        # FIXME: Lo mismo con Qu (QuESO)
         def search(word, to_search, chain):
             """Función recursiva para encontrar los próx. dados para seguir hilando la palabra."""
             if len(word) == 0:

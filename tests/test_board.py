@@ -101,9 +101,7 @@ def test_exists_case_1(monkeypatch, word, expected):
     assert result is expected
 
 
-def test_render(monkeypatch):
-    fake_glifos = dict(zip(string.ascii_lowercase, string.ascii_uppercase))
-    monkeypatch.setattr(board, 'GLYPHS', fake_glifos)
+def test_render():
     b = Board()
     b.distribution = [
         ['a', 'u', 'x', 'f'],
@@ -113,9 +111,9 @@ def test_render(monkeypatch):
     ]
     rendered = b.render()
     expected = textwrap.dedent("""\
-        A U X F
-        T I G R
-        O E F S
-        I E E C
+        A  U  X  F
+        T  I  G  R
+        O  E  F  S
+        I  E  E  C
     """)
     assert rendered == expected

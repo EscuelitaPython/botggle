@@ -67,16 +67,23 @@ class Game:
         """              aeiou""",
     )
 
-    def __init__(self, players, chat):
-        self.players = players
+    def __init__(self, chat):
+        self.players = []
+        self.full_scores = {}
         self._state = self.State.WAITING
-        self.full_scores = {player.username: 0 for player in players}
         self.round_words = defaultdict(set)
         self.board = None
 
         # no lo usamos internamente, pero lo guardamos acá porque es el
         # grupo público donde el juego fue arrancado
         self.chat = chat
+
+    def add_player(self, username):
+        """Carga une jugadore en el juego."""
+        player = Player(username, self)
+        self.players.append(player)
+        self.full_scores[player.username] = 0
+        return player
 
     def start_round(self, board):
         """Arranca la ronda."""

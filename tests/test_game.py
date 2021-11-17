@@ -6,7 +6,7 @@
 
 import botggle.game
 from botggle.board import Board
-from botggle.game import Game, TransitionError, NotActiveError, ResultWords, Player
+from botggle.game import Game, TransitionError, NotActiveError, ResultWords
 
 import pytest
 
@@ -15,12 +15,12 @@ import pytest
 
 
 def test_lifecycle_init():
-    game = Game([], "chat")
+    game = Game("chat")
     assert game._state == Game.State.WAITING
 
 
 def test_lifecycle_start_after_init():
-    game = Game([], "chat")
+    game = Game("chat")
     game.round_words['foo'].add('bar')
     game.start_round(Board())
     assert game._state == Game.State.ACTIVE
@@ -28,14 +28,14 @@ def test_lifecycle_start_after_init():
 
 
 def test_lifecycle_start_when_active():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     with pytest.raises(TransitionError):
         game.start_round(Board())
 
 
 def test_lifecycle_start_when_stopped():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.stop_round()
     with pytest.raises(TransitionError):
@@ -43,11 +43,12 @@ def test_lifecycle_start_when_stopped():
 
 
 def test_lifecycle_next_round_when_stopped():
-    p1 = Player("maria", "fakegame")
+    game = Game("chat")
+    p1 = game.add_player("maria")
     p1.ready = False
-    p2 = Player("juan", "fakegame")
+    p2 = game.add_player("juan")
     p2.ready = True
-    game = Game([p1, p2], "chat")
+
     game.start_round(Board())
     game.stop_round()
     game.next_round()
@@ -56,33 +57,33 @@ def test_lifecycle_next_round_when_stopped():
 
 
 def test_lifecycle_next_round_when_active():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     with pytest.raises(TransitionError):
         game.next_round()
 
 
 def test_lifecycle_next_round_when_waiting():
-    game = Game([], "chat")
+    game = Game("chat")
     with pytest.raises(TransitionError):
         game.next_round()
 
 
 def test_lifecycle_stop_round_when_active():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.stop_round()
     assert game._state == Game.State.STOPPED
 
 
 def test_lifecycle_stop_round_when_waiting():
-    game = Game([], "chat")
+    game = Game("chat")
     with pytest.raises(TransitionError):
         game.stop_round()
 
 
 def test_lifecycle_stop_round_when_stopped():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.stop_round()
     with pytest.raises(TransitionError):
@@ -92,7 +93,7 @@ def test_lifecycle_stop_round_when_stopped():
 # -- pruebas de agregar texto
 
 def test_addtext_when_not_active():
-    game = Game([], "chat")
+    game = Game("chat")
     assert game._state != Game.State.ACTIVE
     with pytest.raises(NotActiveError):
         game.add_text("jdoe", "fruta")
@@ -100,14 +101,14 @@ def test_addtext_when_not_active():
 
 
 def test_addtext_simple():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.add_text("jdoe", "fruta")
     assert game.round_words == {'jdoe': {'fruta'}}
 
 
 def test_addtext_twice_sameword():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.add_text("jdoe", "fruta")
     game.add_text("jdoe", "fruta")
@@ -115,7 +116,7 @@ def test_addtext_twice_sameword():
 
 
 def test_addtext_twice_differentword():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.add_text("jdoe", "fruta1")
     game.add_text("jdoe", "fruta2")
@@ -123,7 +124,7 @@ def test_addtext_twice_differentword():
 
 
 def test_addtext_twice_differentuser():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.add_text("john", "fruta")
     game.add_text("jane", "fruta")
@@ -131,7 +132,7 @@ def test_addtext_twice_differentuser():
 
 
 def test_addtext_twice_all_different():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.add_text("john", "fruta1")
     game.add_text("jane", "fruta2")
@@ -139,14 +140,14 @@ def test_addtext_twice_all_different():
 
 
 def test_addtext_with_spaces():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.add_text("jdoe", " foo   bar   ")
     assert game.round_words == {'jdoe': {'foo', 'bar'}}
 
 
 def test_addtext_with_newlines():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.add_text("jdoe", """
         foo
@@ -157,14 +158,14 @@ def test_addtext_with_newlines():
 
 @pytest.mark.parametrize("char", [',', '-', ';', "'", '"', ':', '[', ']', ',,'])
 def test_addtext_with_rare_chars(char):
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.add_text("jdoe", f"{char}foo{char} bar{char}baz{char}{char}")
     assert game.round_words == {'jdoe': {'foo', 'bar', 'baz'}}
 
 
 def test_addtext_all_chars_mixed():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.add_text("jdoe", """
         foo,-
@@ -176,21 +177,21 @@ def test_addtext_all_chars_mixed():
 
 
 def test_addtext_with_tilde():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.add_text("jdoe", " fooá, fooé fooí-fooó; fooú,fooo")
     assert game.round_words == {'jdoe': {'fooa', 'fooe', 'fooi', 'fooo', 'foou'}}
 
 
 def test_addtext_with_other_letters():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.add_text("jdoe", " moño aäa ")
     assert game.round_words == {'jdoe': {'moño', 'aäa'}}
 
 
 def test_addtext_with_uppercase():
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(Board())
     game.add_text("jdoe", " foo Bar BAZ, MOÑO, CAMIÓN")
     assert game.round_words == {'jdoe': {'foo', 'bar', 'baz', 'moño', 'camion'}}
@@ -205,7 +206,7 @@ def test_evaluate_ok(monkeypatch):
     board = Board()
     board.exists = lambda word: True
 
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(board)
     game.round_words = {'jdoe': {'foo', 'bar'}, 'pepe': {'baz'}}
 
@@ -223,7 +224,7 @@ def test_evaluate_not_in_rae(monkeypatch):
     board = Board()
     board.exists = lambda word: True
 
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(board)
     game.round_words = {'jdoe': {'foo', 'bar'}}
 
@@ -239,7 +240,7 @@ def test_evaluate_not_in_board(monkeypatch):
     board = Board()
     board.exists = lambda word: word in {'bar'}
 
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(board)
     game.round_words = {'jdoe': {'foo', 'bar'}}
 
@@ -255,7 +256,7 @@ def test_evaluate_repeated_valid(monkeypatch):
     board = Board()
     board.exists = lambda word: True
 
-    game = Game([], "chat")
+    game = Game("chat")
     game.start_round(board)
     game.round_words = {
         'jdoe': {'foo', 'bar'},
@@ -280,8 +281,8 @@ def test_evaluate_repeated_valid(monkeypatch):
 # -- pruebas de resumir puntajes
 
 def test_summarize_simple(monkeypatch):
-    players = [Player("juan", "fakegame")]
-    game = Game(players, "chat")
+    game = Game("chat")
+    game.add_player("juan")
     game._calculate_scores = lambda *a: 5
 
     rw = ResultWords(
@@ -298,8 +299,9 @@ def test_summarize_simple(monkeypatch):
 
 
 def test_summarize_double():
-    players = [Player("juan", "fakegame"), Player("mara", "fakegame")]
-    game = Game(players, "chat")
+    game = Game("chat")
+    game.add_player("juan")
+    game.add_player("mara")
     game._calculate_scores = lambda *a: 5
 
     rw = ResultWords(
@@ -320,7 +322,7 @@ def test_summarize_double():
 def test_scores_too_short(length):
     rw = ResultWords(
         valid={"x" * length}, repeated=set(), not_in_language=set(), not_in_board=set())
-    game = Game([], "chat")
+    game = Game("chat")
     score = game._calculate_scores(rw)
     assert score == 0
 
@@ -328,7 +330,7 @@ def test_scores_too_short(length):
 def test_scores_not_valid():
     rw = ResultWords(
         valid=set(), repeated={"foobar"}, not_in_language={"foobar"}, not_in_board={"foobar"})
-    game = Game([], "chat")
+    game = Game("chat")
     score = game._calculate_scores(rw)
     assert score == 0
 
@@ -336,7 +338,7 @@ def test_scores_not_valid():
 def test_scores_too_long():
     rw = ResultWords(
         valid={"x" * 123}, repeated=set(), not_in_language=set(), not_in_board=set())
-    game = Game([], "chat")
+    game = Game("chat")
     score = game._calculate_scores(rw)
     assert score == 79
 
@@ -345,7 +347,7 @@ def test_scores_intermediate(monkeypatch):
     monkeypatch.setattr(botggle.game, "SCORES_TABLE", {6: 123})
     rw = ResultWords(
         valid={"foobar"}, repeated=set(), not_in_language=set(), not_in_board=set())
-    game = Game([], "chat")
+    game = Game("chat")
     score = game._calculate_scores(rw)
     assert score == 123
 
@@ -354,6 +356,26 @@ def test_scores_accumulates(monkeypatch):
     monkeypatch.setattr(botggle.game, "SCORES_TABLE", {6: 123, 3: 15})
     rw = ResultWords(
         valid={"foobar", "yes"}, repeated=set(), not_in_language=set(), not_in_board=set())
-    game = Game([], "chat")
+    game = Game("chat")
     score = game._calculate_scores(rw)
     assert score == 138
+
+
+# -- pruebas del manejo de los players
+
+
+def test_players_init():
+    # que valide como "arrancan" las cosas
+    game = Game("chat")
+    assert game.players == []
+    assert game.full_scores == {}
+
+
+def test_players_add():
+    game = Game("chat")
+    added_player = game.add_player("test-username")
+
+    assert game.players == [added_player]
+    assert game.full_scores == {"test-username": 0}
+
+    assert added_player.game is game

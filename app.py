@@ -23,14 +23,21 @@ from telegram import Update, ForceReply, MessageEntity, ParseMode  # fades pytho
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 from botggle.board import Board
-from botggle.game import Game, NotActiveError, Player
+from botggle.game import Game, NotActiveError
 
 
 # duración de la ronda (en segundos)
-ROUND_TIMEUP = 30  # FIXME: corregir 30 a 120, o traerlo de una "config"
+ROUND_TIMEUP = 30  # FIXME: corregir el default a 3 * 60
 
 # duración del juego en puntos
 SCORES_GAME_LIMIT = 50
+
+# FIXME: que las dos vars de arriba sean configurables (si el juego no está activo) pasando
+#  /config tiempo_ronda=N
+#  /config puntaje_objetivo=N
+#  /config rondas_objetivo=N
+# (los ultimos dos se pisan mutuamente, el default es por puntaje)
+# cuando el bot es invitado al canal dice cuales son sus defaults
 
 # relaciona el username al player
 PLAYER_BY_USERNAME = {}
@@ -89,25 +96,17 @@ def start_command(update: Update, context: CallbackContext) -> None:
     usernames.append(update.effective_user.username)
     print("====== usernames", usernames)
 
-    players = []
     chat = update.effective_chat
     if chat in GAME_BY_CHAT:
         update.message.reply_text(
             "ERROR: ya hay un juego creado en este chat; hacer /terminar para cancelar el viejo")
+        return
 
-    game = Game(players, chat)
+    game = Game(chat)
     GAME_BY_CHAT[chat] = game
     for username in usernames:
-        player = Player(username, game)
-        players.append(player)
+        player = game.add_player(username)
         PLAYER_BY_USERNAME[username] = player
-    # NEXTWEEK
-    # refactorear
-    # game.add_player(username)
-    #   - que cree un Player con (username, self)
-    #   - que se agregue internamente ese Player
-    #   - que lo agregue a "fulls_scores"
-    #   - que lo devuelva porque se usa desde afuera
 
     print(f"Nuevo juego creado para el chat {chat.title!r} con los jugadores {usernames}.")
     print("======= full scores", game.full_scores)
@@ -139,10 +138,12 @@ def time_up(context):
 
     # FIXME: mostrar esto lindo
     game.chat.send_message(f"Como le fue a cada une: {user_words}")
-    # ejemplo de mostrado:
+    # ejemplo de mostrado 1:
     # Diego: coma, punto (repetidas: zaraza; no en el diccionario: punno)
     # Facundo: cumo, panto (repetidas: zaraza)
     # Leandro: pinto (no en el tablero: xuxo; no en el diccionario: panta)
+    # Ej 2
+    # Leandro: casa (3), comienzo (7), coso (emoji de repetido), cruzo (⛔️) - Total 10.
 
     # FIXME: mostrar esto lindo
     game.chat.send_message(f"Progreso del juego: {round_scores} {game.full_scores}")
@@ -193,7 +194,7 @@ def ready_command(update: Update, context: CallbackContext) -> None:
 
     # creamos un tablero y lo mandamos al público y a todes les jugadores
     renderized = board.render()
-    game.chat.send_message(renderized)
+    game.chat.send_message(renderized)  # FIXME: hacer que esto salga "monospaced"
     for player in game.players:
         # FIXME: revisar si esto anda
         player.chat.send_message(renderized)
@@ -215,6 +216,8 @@ def main(token: str) -> None:
     dispatcher.add_handler(CommandHandler("comienzo", start_command))
     dispatcher.add_handler(CommandHandler("listo", ready_command))
     # FIXME: implementar un "terminar" para cancelar el juego
+    # FIXME: hacer un comando /g o /grilla que muestre la grilla
+    # FIXME: hacer un comando /status que diga si hay un juego creado o no, y con qué jugadores
 
     # para todas las palabras que tira un jugador por privado
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, game_words))
