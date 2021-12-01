@@ -26,13 +26,17 @@ from botggle.board import Board
 from botggle.game import Game, NotActiveError
 
 
+# TOISSUE: mejorar rae_words.txt para incorporar cosas que faltan:
+# - pode (podé, podar en pasado)
+# - matad ("vosotros matad!")
+
 # duración de la ronda (en segundos)
 ROUND_TIMEUP = 30  # FIXME: corregir el default a 3 * 60
 
 # duración del juego en puntos
 SCORES_GAME_LIMIT = 50
 
-# FIXME: que las dos vars de arriba sean configurables (si el juego no está activo) pasando
+# TOISSUE: que las dos vars de arriba sean configurables (si el juego no está activo) pasando
 #  /config tiempo_ronda=N
 #  /config puntaje_objetivo=N
 #  /config rondas_objetivo=N
@@ -58,7 +62,7 @@ def start(update: Update, context: CallbackContext) -> None:
 
 def help_command(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /help is issued."""
-    # FIXME: contestar una ayuda como corresponde
+    # TOISSUE: contestar una ayuda como corresponde
     update.message.reply_text('Help!')
 
 
@@ -74,14 +78,9 @@ def game_words(update: Update, context: CallbackContext) -> None:
     try:
         player.game.add_text(username, text)
     except NotActiveError:
-        # FIXME: decirle al usuario qu esa palabra entró cuando la ronda
-        # había terminado
-        print("====== palabra fuera de orden", username, repr(text))
-    else:
-        print("========== agregamos palabra", username, repr(text))
+        player.chat.send_message(f"La palabra {text!r} llegó tarde")
 
-    # FIXME: luego de N palabras, tirarle de nuevo el tablero así no se le va demasiado arriba
-    # update.message.reply_text()
+    # TOISSUE: luego de N palabras, tirarle de nuevo el tablero así no se le va demasiado arriba
 
 
 def start_command(update: Update, context: CallbackContext) -> None:
@@ -113,7 +112,7 @@ def start_command(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(
         "Juego arrancado, esperando que los jugadores digan /listo **por privado**.",
         parse_mode=ParseMode.MARKDOWN)
-    # FIXME: este bold de acá arriba no anda :/
+    # TOISSUE: este bold de acá arriba no anda :/
 
     # FIXME: acá podríamos decirle a cada jugador que le invitaron a jugar en el chat "tal" y que
     # tiene que decir /listo para arrancar -- esto va a funcionar si alguna vez el usuario le dio
@@ -127,7 +126,9 @@ def time_up(context):
     game = payload['game']
     game.stop_round()
 
-    # FIXME: avisamos a todes por privado que listo
+    # avisamos a todes por privado que listo
+    for player in game.players:
+        player.chat.send_message("Se acabó el tiempo")
 
     # avisamos en el público que terminó la ronda
     game.chat.send_message("¡Se terminó la ronda!")
@@ -136,7 +137,7 @@ def time_up(context):
     user_words = game.evaluate_words()
     round_scores = game.summarize_scores(user_words)
 
-    # FIXME: mostrar esto lindo
+    # TOISSUE: mostrar esto lindo
     game.chat.send_message(f"Como le fue a cada une: {user_words}")
     # ejemplo de mostrado 1:
     # Diego: coma, punto (repetidas: zaraza; no en el diccionario: punno)
@@ -145,17 +146,20 @@ def time_up(context):
     # Ej 2
     # Leandro: casa (3), comienzo (7), coso (emoji de repetido), cruzo (⛔️) - Total 10.
 
-    # FIXME: mostrar esto lindo
+    # TOISSUE: mostrar esto lindo
     game.chat.send_message(f"Progreso del juego: {round_scores} {game.full_scores}")
 
     # avanzamos el juego
     if max(game.full_scores.values(), default=0) < SCORES_GAME_LIMIT:
-        # FIXME: avisar a todes (POR PRIVADO!!!) que estamos listos para la próxima ronda
+        for player in game.players:
+            player.chat.send_message("Ya podemos arrancar la próxima ronda, escribí /listo")
         game.next_round()
         return
 
     print("========== ganó FULANO!!!")
     # FIXME: mostrar bien quien ganó, y terminar el juego (onda game.finish()???)
+    # NEXTWEEK -- y charlar sobre qué pasa al ejecutar dos juegos en distintos canales
+    # -- y validar que un jugador NO pueda estar en dos juegos al mismo tiempo
 
     # limpiamos las globales
     del GAME_BY_CHAT[game.chat]
@@ -194,9 +198,8 @@ def ready_command(update: Update, context: CallbackContext) -> None:
 
     # creamos un tablero y lo mandamos al público y a todes les jugadores
     renderized = board.render()
-    game.chat.send_message(renderized)  # FIXME: hacer que esto salga "monospaced"
+    game.chat.send_message(renderized)
     for player in game.players:
-        # FIXME: revisar si esto anda
         player.chat.send_message(renderized)
 
     context.job_queue.run_once(time_up, ROUND_TIMEUP, context={'game': game})
@@ -216,7 +219,7 @@ def main(token: str) -> None:
     dispatcher.add_handler(CommandHandler("comienzo", start_command))
     dispatcher.add_handler(CommandHandler("listo", ready_command))
     # FIXME: implementar un "terminar" para cancelar el juego
-    # FIXME: hacer un comando /g o /grilla que muestre la grilla
+    # TOISSUE: hacer un comando /g o /grilla que muestre la grilla
     # FIXME: hacer un comando /status que diga si hay un juego creado o no, y con qué jugadores
 
     # para todas las palabras que tira un jugador por privado
@@ -233,7 +236,7 @@ def main(token: str) -> None:
 
 
 if __name__ == '__main__':
-    credentials_filepath = sys.argv[1]  # FIXME: manejar correctamente los parámetros de ejecución
+    credentials_filepath = sys.argv[1]  # TOISSUE: manejar correctamente los params de ejecución
     auth = infoauth.load(credentials_filepath)
     token = auth["token"]
     main(token)

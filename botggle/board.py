@@ -98,42 +98,40 @@ class Board:
 
     def render(self):
         """Prepara un mensaje para mandar el tablero a un chat."""
-        # FIXME: que esto genere una imagen que simule los daditos
+        # TOISSUE: que esto genere una imagen que simule los daditos
         result_lines = []
         for dist_line in self.distribution:
             line = [char.upper() for char in dist_line]
             result_lines.append("  ".join(line))
         return "\n".join(result_lines) + "\n"
 
+    def _recursive_search(self, word, to_search, chain):
+        """Función recursiva para encontrar los próx. dados para seguir hilando la palabra."""
+        if len(word) == 0:
+            return True
+
+        useful_dices = [lc for lc in to_search if word.startswith(lc.char)]
+        for dice in useful_dices:
+            if any(dice == chain_dice for chain_dice in chain[1:]):
+                # algún dado de los anteriores (menos el primero) es igual al que sería el
+                # próximo, entonces en realidad el próximo no es útil
+                continue
+
+            if chain and dice == chain[0] and len(word) > 1:
+                # Por qué el 1:
+                #   si el largo es 0: nunca llegamos acá porque tenemos el corte al pcipio
+                #   si el largo es 1: el próximo dado (el que tenemos acá como "util") es el
+                #       último, y está bien que se repita con el primero
+                #   si el largo es mayor a uno: el próximo dado, que se repite con el primero,
+                #       no sería el último, y eso está mal
+                continue
+
+            chain_with_current_dice = chain + [dice]
+            remaining = word[len(dice.char):]
+            if self._recursive_search(remaining, self._word_graph[dice], chain_with_current_dice):
+                return True
+        return False
+
     def exists(self, word: str) -> bool:
         """Return if the word exists in the board."""
-        # FIXME: este algoritmo se rompe para palabras que tengan "CH" y que pasen por un
-        # dado con "CH" (no dos con "C" y "H")
-        # FIXME: Lo mismo con Qu (QuESO)
-        def search(word, to_search, chain):
-            """Función recursiva para encontrar los próx. dados para seguir hilando la palabra."""
-            if len(word) == 0:
-                return True
-
-            useful_dices = [lc for lc in to_search if lc.char == word[0]]
-            for dice in useful_dices:
-                if any(dice == chain_dice for chain_dice in chain[1:]):
-                    # algún dado de los anteriores (menos el primero) es igual al que sería el
-                    # próximo, entonces en realidad el próximo no es útil
-                    continue
-
-                if chain and dice == chain[0] and len(word) > 1:
-                    # Por qué el 1:
-                    #   si el largo es 0: nunca llegamos acá porque tenemos el corte al pcipio
-                    #   si el largo es 1: el próximo dado (el que tenemos acá como "util") es el
-                    #       último, y está bien que se repita con el primero
-                    #   si el largo es mayor a uno: el próximo dado, que se repite con el primero,
-                    #       no sería el último, y eso está mal
-                    continue
-
-                chain_with_current_dice = chain + [dice]
-                if search(word[1:], self._word_graph[dice], chain_with_current_dice):
-                    return True
-            return False
-
-        return search(word, self._word_graph.keys(), [])
+        return self._recursive_search(word, self._word_graph.keys(), [])

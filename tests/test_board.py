@@ -1,9 +1,7 @@
 """Tests for the board module."""
 
-import string
 import textwrap
 
-from botggle import board
 from botggle.board import Board, LocatedChar as LC
 
 import pytest
@@ -87,7 +85,7 @@ def test_exists_simple_missing(monkeypatch):
     ("abcdqzlxab", False),
     ("abcdqzblx", False),
 ])
-def test_exists_case_1(monkeypatch, word, expected):
+def test_exists_case_multiple(monkeypatch, word, expected):
     distribution = [
         list("abcd"),
         list("xlzq"),
@@ -117,3 +115,26 @@ def test_render():
         I  E  E  C
     """)
     assert rendered == expected
+
+
+@pytest.mark.parametrize("word,expected", [
+    ("chal", True),
+    ("choza", True),
+    ("bloque", True),
+    ("bchz", True),
+    ("bacho", True),
+    ("cholcho", True),
+    ("choque", True),
+])
+def test_exists_case_double_dices(monkeypatch, word, expected):
+    distribution = [
+        ["a", "b", "c", "h"],
+        ["ch", "l", "o", "z"],
+        ["h", "o", "s", "a"],
+        ["j", "qu", "e", "j"],
+    ]
+    monkeypatch.setattr(Board, "_get_distribution", lambda self: distribution)
+
+    b = Board()
+    result = b.exists(word)
+    assert result is expected
