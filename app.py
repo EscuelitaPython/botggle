@@ -42,6 +42,7 @@ SCORES_GAME_LIMIT = 50
 #  /config rondas_objetivo=N
 # (los ultimos dos se pisan mutuamente, el default es por puntaje)
 # cuando el bot es invitado al canal dice cuales son sus defaults
+# esta config es POR CHAT
 
 # relaciona el username al player
 PLAYER_BY_USERNAME = {}
@@ -101,6 +102,15 @@ def start_command(update: Update, context: CallbackContext) -> None:
             "ERROR: ya hay un juego creado en este chat; hacer /terminar para cancelar el viejo")
         return
 
+    usernames_of_all_games = set()
+    for game in GAME_BY_CHAT.values():
+        usernames_of_all_games.update(p.username for p in game.players)
+    in_other_games = set(usernames) & usernames_of_all_games
+    if in_other_games:
+        update.message.reply_text(
+            f"ERROR: estes jugadores ya están en otro juego en otro chat: {in_other_games}")
+        return
+
     game = Game(chat)
     GAME_BY_CHAT[chat] = game
     for username in usernames:
@@ -156,10 +166,9 @@ def time_up(context):
         game.next_round()
         return
 
-    print("========== ganó FULANO!!!")
-    # FIXME: mostrar bien quien ganó, y terminar el juego (onda game.finish()???)
-    # NEXTWEEK -- y charlar sobre qué pasa al ejecutar dos juegos en distintos canales
-    # -- y validar que un jugador NO pueda estar en dos juegos al mismo tiempo
+    max_score = max(game.full_scores.values())
+    winners = [username for username, score in game.full_scores.items() if score == max_score]
+    game.chat.send_message(f"Juego terminado!! Ganó {winners}")
 
     # limpiamos las globales
     del GAME_BY_CHAT[game.chat]
@@ -221,6 +230,9 @@ def main(token: str) -> None:
     # FIXME: implementar un "terminar" para cancelar el juego
     # TOISSUE: hacer un comando /g o /grilla que muestre la grilla
     # FIXME: hacer un comando /status que diga si hay un juego creado o no, y con qué jugadores
+    # TOISSUE: hacer un comando /renunciar que haga que el jugador que lo tira se vaya del juego
+    #    (sólo esa persona, el juego sigue activo si le quedan al menos dos jugadores);
+    #    también limpiar de los scores (hay que hacer game.remove_player(username) )
 
     # para todas las palabras que tira un jugador por privado
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, game_words))
