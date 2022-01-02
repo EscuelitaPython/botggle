@@ -4,17 +4,7 @@
 # License: GPL-3
 # More info: https://github.com/EscuelitaPython/botggle
 
-""" Simple Bot to reply to Telegram messages.
-
-First, a few handler functions are defined. Then, those functions are passed to
-the Dispatcher and registered at their respective places.
-Then, the bot is started and runs until we press Ctrl-C on the command line.
-
-Usage:
-Basic Echobot example, repeats messages.
-Press Ctrl-C on the command line or send a signal to the process to stop the
-bot.
-"""
+"""Un juego como el Boggle para jugar en grupo via Telegram."""
 
 import sys
 
@@ -25,24 +15,11 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from botggle.board import Board
 from botggle.game import Game, NotActiveError
 
-
-# TOISSUE: mejorar rae_words.txt para incorporar cosas que faltan:
-# - pode (podé, podar en pasado)
-# - matad ("vosotros matad!")
-
 # duración de la ronda (en segundos)
-ROUND_TIMEUP = 30  # FIXME: corregir el default a 3 * 60
+ROUND_TIMEUP = 2 * 60
 
 # duración del juego en puntos
 SCORES_GAME_LIMIT = 50
-
-# TOISSUE: que las dos vars de arriba sean configurables (si el juego no está activo) pasando
-#  /config tiempo_ronda=N
-#  /config puntaje_objetivo=N
-#  /config rondas_objetivo=N
-# (los ultimos dos se pisan mutuamente, el default es por puntaje)
-# cuando el bot es invitado al canal dice cuales son sus defaults
-# esta config es POR CHAT
 
 # relaciona el username al player
 PLAYER_BY_USERNAME = {}
@@ -63,7 +40,6 @@ def start(update: Update, context: CallbackContext) -> None:
 
 def help_command(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /help is issued."""
-    # TOISSUE: contestar una ayuda como corresponde
     update.message.reply_text('Help!')
 
 
@@ -80,8 +56,6 @@ def game_words(update: Update, context: CallbackContext) -> None:
         player.game.add_text(username, text)
     except NotActiveError:
         player.chat.send_message(f"La palabra {text!r} llegó tarde")
-
-    # TOISSUE: luego de N palabras, tirarle de nuevo el tablero así no se le va demasiado arriba
 
 
 def start_command(update: Update, context: CallbackContext) -> None:
@@ -122,11 +96,6 @@ def start_command(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(
         "Juego arrancado, esperando que los jugadores digan /listo **por privado**.",
         parse_mode=ParseMode.MARKDOWN)
-    # TOISSUE: este bold de acá arriba no anda :/
-
-    # FIXME: acá podríamos decirle a cada jugador que le invitaron a jugar en el chat "tal" y que
-    # tiene que decir /listo para arrancar -- esto va a funcionar si alguna vez el usuario le dio
-    # /start al bot, y si no, no :shrug:
 
 
 def time_up(context):
@@ -147,16 +116,8 @@ def time_up(context):
     user_words = game.evaluate_words()
     round_scores = game.summarize_scores(user_words)
 
-    # TOISSUE: mostrar esto lindo
     game.chat.send_message(f"Como le fue a cada une: {user_words}")
-    # ejemplo de mostrado 1:
-    # Diego: coma, punto (repetidas: zaraza; no en el diccionario: punno)
-    # Facundo: cumo, panto (repetidas: zaraza)
-    # Leandro: pinto (no en el tablero: xuxo; no en el diccionario: panta)
-    # Ej 2
-    # Leandro: casa (3), comienzo (7), coso (emoji de repetido), cruzo (⛔️) - Total 10.
 
-    # TOISSUE: mostrar esto lindo
     game.chat.send_message(f"Progreso del juego: {round_scores} {game.full_scores}")
 
     # avanzamos el juego
@@ -178,7 +139,6 @@ def time_up(context):
 
 def ready_command(update: Update, context: CallbackContext) -> None:
     """Soporte para comando /listo."""
-    # FIXME: si lo dijeron por el público, resaltar que es POR PRIVADO (para poder hablarle al jug)
     username = update.effective_user.username
     print(f"El usuario {username} dijo listo")
 
@@ -227,12 +187,6 @@ def main(token: str) -> None:
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("comienzo", start_command))
     dispatcher.add_handler(CommandHandler("listo", ready_command))
-    # FIXME: implementar un "terminar" para cancelar el juego
-    # TOISSUE: hacer un comando /g o /grilla que muestre la grilla
-    # FIXME: hacer un comando /status que diga si hay un juego creado o no, y con qué jugadores
-    # TOISSUE: hacer un comando /renunciar que haga que el jugador que lo tira se vaya del juego
-    #    (sólo esa persona, el juego sigue activo si le quedan al menos dos jugadores);
-    #    también limpiar de los scores (hay que hacer game.remove_player(username) )
 
     # para todas las palabras que tira un jugador por privado
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, game_words))
@@ -248,7 +202,7 @@ def main(token: str) -> None:
 
 
 if __name__ == '__main__':
-    credentials_filepath = sys.argv[1]  # TOISSUE: manejar correctamente los params de ejecución
+    credentials_filepath = sys.argv[1]
     auth = infoauth.load(credentials_filepath)
     token = auth["token"]
     main(token)

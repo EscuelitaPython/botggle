@@ -98,7 +98,6 @@ class Board:
 
     def render(self):
         """Prepara un mensaje para mandar el tablero a un chat."""
-        # TOISSUE: que esto genere una imagen que simule los daditos
         result_lines = []
         for dist_line in self.distribution:
             line = [char.upper() for char in dist_line]
