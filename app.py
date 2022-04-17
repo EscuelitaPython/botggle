@@ -1,6 +1,6 @@
 #!/usr/bin/env fades
 
-# Copyright 2021 Escuelita Python
+# Copyright 2021-2022 Escuelita Python
 # License: GPL-3
 # More info: https://github.com/EscuelitaPython/botggle
 
@@ -9,11 +9,12 @@
 import sys
 
 import infoauth  # fades
-from telegram import Update, ForceReply, MessageEntity, ParseMode  # fades python-telegram-bot
+from telegram import Update, MessageEntity, ParseMode  # fades python-telegram-bot
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 from botggle.board import Board
 from botggle.game import Game, NotActiveError
+from botggle.messages import get_user_round_result
 
 # duración de la ronda (en segundos)
 ROUND_TIMEUP = 2 * 60
@@ -31,11 +32,8 @@ GAME_BY_CHAT = {}
 def start(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
     user = update.effective_user
-    print("Bot invited to some chat by", user.username)
-    update.message.reply_markdown_v2(
-        f'Gracias {user.mention_markdown_v2()} por invitarme a jugar :)',
-        reply_markup=ForceReply(selective=True),
-    )
+    print(f"Bot invited to some chat by {user.username} ({user.full_name!r})")
+    update.message.reply_text(f'Gracias {user.full_name} por invitarme a jugar :)')
 
 
 def help_command(update: Update, context: CallbackContext) -> None:
@@ -47,6 +45,7 @@ def game_words(update: Update, context: CallbackContext) -> None:
     """Recibe las palabras de cada player."""
     username = update.effective_user.username
     text = update.message.text
+    print("======= palabra", username, repr(text))
     player = PLAYER_BY_USERNAME.get(username)
     if player is None:
         print(f"==== ignoramos al usuario {username} por hablar fuera de orden")
@@ -116,7 +115,11 @@ def time_up(context):
     user_words = game.evaluate_words()
     round_scores = game.summarize_scores(user_words)
 
-    game.chat.send_message(f"Como le fue a cada une: {user_words}")
+    round_text_result = ["Como le fue a cada une:"]
+    for username, resultwords in sorted(user_words.items()):
+        text_result = get_user_round_result(resultwords)
+        round_text_result.append(f"- {username}: {text_result}")
+    game.chat.send_message("\n".join(round_text_result))
 
     game.chat.send_message(f"Progreso del juego: {round_scores} {game.full_scores}")
 
